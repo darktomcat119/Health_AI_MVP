@@ -6,15 +6,13 @@ Every model includes json_schema_extra for OpenAPI documentation.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, model_config
+from pydantic import BaseModel, Field
 
 from app.models.enums import RiskLevel
 
 
 class ChatRequest(BaseModel):
     """Incoming chat message from the user."""
-
-    model_config = model_config  # noqa: F811
 
     session_id: str | None = Field(
         default=None,

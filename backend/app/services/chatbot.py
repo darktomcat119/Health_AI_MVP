@@ -158,22 +158,22 @@ class ChatbotService:
         """
         lower = message.lower()
 
+        if self._matches_farewell(lower):
+            return self._response_farewell()
         if self._matches_greeting(lower):
             return self._response_greeting(session)
+        if self._matches_sleep(lower):
+            return self._response_sleep()
         if self._matches_stress(lower):
             return self._response_stress()
         if self._matches_sadness(lower):
             return self._response_sadness()
-        if self._matches_positive(lower):
-            return self._response_positive()
-        if self._matches_sleep(lower):
-            return self._response_sleep()
         if self._matches_relationship(lower):
             return self._response_relationship()
         if self._matches_work_school(lower):
             return self._response_work_school()
-        if self._matches_farewell(lower):
-            return self._response_farewell()
+        if self._matches_positive(lower):
+            return self._response_positive()
         return self._response_default()
 
     def _matches_greeting(self, text: str) -> bool:
@@ -260,9 +260,9 @@ class ChatbotService:
         """Return sleep-focused acknowledgment."""
         return (
             "Sleep is so fundamental to how we feel during the day, and I'm sorry "
-            "you've been struggling with it. Poor sleep can amplify everything else "
+            "that rest hasn't been coming easily. Poor sleep can amplify everything else "
             "we're dealing with. Can you tell me more about what your nights look like? "
-            "For example, do you have trouble falling asleep, staying asleep, or both?"
+            "For example, is the difficulty with falling asleep, staying asleep, or both?"
         )
 
     def _response_relationship(self) -> str:
