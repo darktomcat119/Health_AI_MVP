@@ -1,0 +1,70 @@
+{
+  "critical": {
+    "weight_min": 25,
+    "weight_max": 30,
+    "keywords": [
+      "suicide",
+      "kill myself",
+      "end my life",
+      "want to die",
+      "no reason to live",
+      "suicidio",
+      "matarme",
+      "quiero morir",
+      "acabar con mi vida",
+      "no tengo razón para vivir"
+    ]
+  },
+  "severe": {
+    "weight_min": 15,
+    "weight_max": 20,
+    "keywords": [
+      "self-harm",
+      "hurt myself",
+      "cut myself",
+      "hopeless",
+      "can't go on",
+      "no way out",
+      "nobody cares",
+      "better off without me",
+      "autolesión",
+      "hacerme daño",
+      "sin esperanza",
+      "no puedo más",
+      "nadie me quiere",
+      "estarían mejor sin mí"
+    ]
+  },
+  "moderate": {
+    "weight_min": 5,
+    "weight_max": 10,
+    "keywords": [
+      "depressed",
+      "anxious",
+      "lonely",
+      "overwhelmed",
+      "exhausted",
+      "scared",
+      "angry",
+      "frustrated",
+      "sad",
+      "worthless",
+      "useless",
+      "empty",
+      "numb",
+      "broken",
+      "crying",
+      "panic",
+      "suffering",
+      "deprimido",
+      "ansioso",
+      "solo",
+      "agotado",
+      "triste",
+      "vacío",
+      "llorando",
+      "pánico",
+      "sufriendo"
+    ]
+  }
+}

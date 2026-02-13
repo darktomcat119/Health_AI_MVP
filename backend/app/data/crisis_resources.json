@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Linea de la Vida",
+    "number": "800-911-2000",
+    "hours": "24/7",
+    "type": "hotline",
+    "description": "Free national crisis hotline operated by the Mexican government. Provides emotional support and crisis intervention.",
+    "display_text": "Linea de la Vida: 800-911-2000 (free, national, 24/7)"
+  },
+  {
+    "name": "SAPTEL",
+    "number": "55 5259-8121",
+    "hours": "24/7",
+    "type": "hotline",
+    "description": "Professional telephone crisis counseling by the Mexican Red Cross. Trained psychologists available around the clock.",
+    "display_text": "SAPTEL: 55 5259-8121 (24/7)"
+  },
+  {
+    "name": "Emergency Services",
+    "number": "911",
+    "hours": "24/7",
+    "type": "emergency",
+    "description": "National emergency number for Mexico. Call for immediate life-threatening situations.",
+    "display_text": "Emergency: 911"
+  }
+]
