@@ -2,6 +2,10 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
+/** Direct backend URL for SSE streaming (bypasses Next.js rewrite proxy). */
+export const STREAM_URL =
+  process.env.NEXT_PUBLIC_STREAM_URL || API_BASE;
+
 /** Risk level to color class mapping for indicators. */
 export const RISK_COLOR_MAP: Record<string, string> = {
   low: "bg-green-500",

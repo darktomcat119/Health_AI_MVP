@@ -22,10 +22,10 @@ _EMAIL_PATTERN = re.compile(
 )
 
 _PHONE_PATTERN = re.compile(
-    r"(?:\+52\s?)?"        # optional country code
-    r"(?:\(?\d{2,3}\)?\s?)"  # area code
-    r"(?:\d{4}[-\s]?\d{4})"  # subscriber number
-    r"|\b\d{10}\b"         # plain 10-digit number
+    r"(?:\+52\s?)?"            # optional country code
+    r"(?:\(?\d{2,3}\)?[-\s]?)" # area code with optional dash/space
+    r"(?:\d{4}[-\s]?\d{4})"   # subscriber number
+    r"|\b\d{10}\b"            # plain 10-digit number
 )
 
 _NAME_PATTERN = re.compile(

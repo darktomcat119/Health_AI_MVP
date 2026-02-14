@@ -106,7 +106,8 @@ export function useChat(): UseChatReturn {
           });
         },
 
-        onError: (_error: Error) => {
+        onError: (error: Error) => {
+          replaceStreamContent(error.message || "Something went wrong. Please try again.");
           stopStreamingAction();
         },
       });

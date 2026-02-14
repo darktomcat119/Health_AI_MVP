@@ -1,4 +1,4 @@
-import { API_BASE } from "@/utils/constants";
+import { STREAM_URL } from "@/utils/constants";
 import type { CrisisResource, MessageMetadata } from "@/types";
 
 /** Callbacks for handling SSE stream events. */
@@ -49,7 +49,7 @@ async function processStream(
   callbacks: SSECallbacks,
   signal: AbortSignal
 ): Promise<void> {
-  const response = await fetch(`${API_BASE}/chat/stream`, {
+  const response = await fetch(`${STREAM_URL}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -130,6 +130,9 @@ function routeEvent(
       break;
     case "replace":
       callbacks.onReplace(data.content as string);
+      break;
+    case "error":
+      callbacks.onError(new Error((data.message as string) || "Stream error"));
       break;
     case "done":
       callbacks.onDone(data as unknown as { session_message_count: number });

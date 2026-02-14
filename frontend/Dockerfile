@@ -13,6 +13,7 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_API_URL=/api
+ENV NEXT_PUBLIC_STREAM_URL=http://localhost:8001/api/v1
 ENV BACKEND_URL=http://backend:8000/api/v1
 RUN npm run build
 

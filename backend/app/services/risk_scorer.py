@@ -112,11 +112,21 @@ class RiskScorer:
                 MAX_TOTAL_SCORE,
             )
 
+            # Critical keyword override: safety-critical keywords must
+            # always reach the corresponding threshold regardless of
+            # other signals, to guarantee triage activation.
+            matched_tier = self._match_keyword_tier(lower_message)
+            settings = get_settings()
+            if matched_tier == "critical":
+                total = max(total, settings.risk_threshold_critical)
+            elif matched_tier == "severe":
+                total = max(total, settings.risk_threshold_high)
+
             logger.debug(
                 "Risk signals: keyword=%d, sentiment=%d, behavioral=%d, "
-                "escalation=%d, history=%d",
+                "escalation=%d, history=%d, tier_override=%s",
                 keyword_score, sentiment_score, behavioral_score,
-                escalation_score, history_score,
+                escalation_score, history_score, matched_tier or "none",
             )
             logger.info(
                 "Risk score computed: session_id=%s, score=%d",
@@ -148,6 +158,24 @@ class RiskScorer:
         if score >= 30:
             return RiskLevel.MEDIUM
         return RiskLevel.LOW
+
+    def _match_keyword_tier(self, lower_message: str) -> str | None:
+        """Return the highest severity tier matched, or None.
+
+        Args:
+            lower_message: Lowercased user message.
+
+        Returns:
+            Tier name ('critical', 'severe', 'moderate') or None.
+        """
+        tier_priority = ["critical", "severe", "moderate"]
+        for tier_name in tier_priority:
+            if tier_name not in self._keywords:
+                continue
+            for keyword in self._keywords[tier_name]["keywords"]:
+                if keyword in lower_message:
+                    return tier_name
+        return None
 
     def _score_keywords(self, lower_message: str) -> int:
         """Score based on keyword severity tier matches (max 30).

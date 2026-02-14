@@ -13,11 +13,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import (
+    get_anonymizer,
     get_chatbot_service,
     get_risk_scorer,
     get_session_service,
     get_triage_evaluator,
 )
+from app.services.anonymizer import Anonymizer
 from app.exceptions import SessionExpiredException, SessionNotFoundException
 from app.models.enums import MessageRole
 from app.models.schemas import (
@@ -54,6 +56,7 @@ async def send_message(
     risk_scorer: RiskScorer = Depends(get_risk_scorer),
     triage_evaluator: TriageEvaluator = Depends(get_triage_evaluator),
     chatbot: ChatbotService = Depends(get_chatbot_service),
+    anonymizer: Anonymizer = Depends(get_anonymizer),
 ) -> ChatResponse:
     """Process a user message and return the bot response.
 
@@ -63,6 +66,7 @@ async def send_message(
         risk_scorer: Injected risk scoring engine.
         triage_evaluator: Injected triage evaluator.
         chatbot: Injected chatbot service.
+        anonymizer: Injected PII anonymizer.
 
     Returns:
         ChatResponse with bot response and risk assessment.
@@ -73,11 +77,15 @@ async def send_message(
     try:
         session = session_service.get_or_create(request.session_id)
 
+        # Risk scoring uses the raw message for accurate keyword detection
         risk_score = risk_scorer.compute(request.user_message, session)
         risk_level = risk_scorer.classify(risk_score)
 
+        # Anonymize PII before storing in session (session must never hold raw PII)
+        safe_message = anonymizer.anonymize(request.user_message)
+
         session = session_service.add_user_message(
-            session, request.user_message, risk_score, risk_level,
+            session, safe_message, risk_score, risk_level,
         )
 
         triage = triage_evaluator.evaluate(
@@ -136,6 +144,7 @@ async def stream_message(
     risk_scorer: RiskScorer = Depends(get_risk_scorer),
     triage_evaluator: TriageEvaluator = Depends(get_triage_evaluator),
     chatbot: ChatbotService = Depends(get_chatbot_service),
+    anonymizer: Anonymizer = Depends(get_anonymizer),
 ) -> StreamingResponse:
     """Stream a chat response via Server-Sent Events.
 
@@ -151,6 +160,7 @@ async def stream_message(
         risk_scorer: Injected risk scoring engine.
         triage_evaluator: Injected triage evaluator.
         chatbot: Injected chatbot service.
+        anonymizer: Injected PII anonymizer.
 
     Returns:
         StreamingResponse with SSE event stream.
@@ -160,8 +170,11 @@ async def stream_message(
     risk_score = risk_scorer.compute(request.user_message, session)
     risk_level = risk_scorer.classify(risk_score)
 
+    # Anonymize PII before storing in session
+    safe_message = anonymizer.anonymize(request.user_message)
+
     session = session_service.add_user_message(
-        session, request.user_message, risk_score, risk_level,
+        session, safe_message, risk_score, risk_level,
     )
 
     triage = triage_evaluator.evaluate(
@@ -197,30 +210,36 @@ async def stream_message(
             }
             yield f"data: {json.dumps(crisis_data)}\n\n"
 
-        if triage.override_response:
-            # Triage override: fake-stream the canned response
-            words = triage.override_response.split(" ")
-            for i, word in enumerate(words):
-                token = word + (" " if i < len(words) - 1 else "")
-                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
-                await asyncio.sleep(STREAM_TOKEN_DELAY_SECONDS)
-            bot_response = triage.override_response
-        else:
-            # Stream tokens from the LLM in real time
-            bot_response = ""
-            async for token in chatbot.stream_response(request.user_message, session):
-                if token.startswith("__REPLACE__"):
-                    # Validation replaced the response
-                    replacement = token[len("__REPLACE__"):]
-                    replace_data = {"type": "replace", "content": replacement}
-                    yield f"data: {json.dumps(replace_data)}\n\n"
-                    bot_response = replacement
-                else:
-                    bot_response += token
-                    token_data = {"type": "token", "content": token}
-                    yield f"data: {json.dumps(token_data)}\n\n"
+        bot_response = ""
+        try:
+            if triage.override_response:
+                # Triage override: fake-stream the canned response
+                words = triage.override_response.split(" ")
+                for i, word in enumerate(words):
+                    token = word + (" " if i < len(words) - 1 else "")
+                    yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+                    await asyncio.sleep(STREAM_TOKEN_DELAY_SECONDS)
+                bot_response = triage.override_response
+            else:
+                # Stream tokens from the LLM in real time
+                async for token in chatbot.stream_response(request.user_message, session):
+                    if token.startswith("__REPLACE__"):
+                        # Validation replaced the response
+                        replacement = token[len("__REPLACE__"):]
+                        replace_data = {"type": "replace", "content": replacement}
+                        yield f"data: {json.dumps(replace_data)}\n\n"
+                        bot_response = replacement
+                    else:
+                        bot_response += token
+                        token_data = {"type": "token", "content": token}
+                        yield f"data: {json.dumps(token_data)}\n\n"
+        except Exception as exc:
+            logger.error("Stream error: session_id=%s, error=%s", session.id, exc)
+            error_data = {"type": "error", "message": "Something went wrong. Please try again."}
+            yield f"data: {json.dumps(error_data)}\n\n"
 
-        session_service.add_bot_message(session, bot_response)
+        if bot_response:
+            session_service.add_bot_message(session, bot_response)
 
         done_data = {
             "type": "done",
