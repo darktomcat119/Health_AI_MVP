@@ -5,11 +5,10 @@ services:
       dockerfile: Dockerfile
     container_name: chatbot-backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
+    env_file:
+      - ./backend/.env
     environment:
-      - APP_ENV=development
-      - LOG_LEVEL=INFO
-      - LLM_PROVIDER=mock
       - FRONTEND_URL=http://localhost:3000
     volumes:
       - ./backend:/app
@@ -30,7 +29,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000/api/v1
+      - BACKEND_URL=http://backend:8000/api/v1
     depends_on:
       backend:
         condition: service_healthy
@@ -45,7 +44,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000/api/v1
+      - NEXT_PUBLIC_API_URL=/api
+      - BACKEND_URL=http://backend:8000/api/v1
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public

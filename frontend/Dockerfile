@@ -12,6 +12,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_API_URL=/api
+ENV BACKEND_URL=http://backend:8000/api/v1
 RUN npm run build
 
 # --- Production stage ---

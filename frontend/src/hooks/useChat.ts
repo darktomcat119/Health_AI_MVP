@@ -54,6 +54,7 @@ export function useChat(): UseChatReturn {
   const addUserMessage = useChatStore((state) => state.addUserMessage);
   const startStreaming = useChatStore((state) => state.startStreaming);
   const appendStreamToken = useChatStore((state) => state.appendStreamToken);
+  const replaceStreamContent = useChatStore((state) => state.replaceStreamContent);
   const finalizeStream = useChatStore((state) => state.finalizeStream);
   const stopStreamingAction = useChatStore((state) => state.stopStreaming);
   const setActiveSession = useChatStore((state) => state.setActiveSession);
@@ -90,6 +91,10 @@ export function useChat(): UseChatReturn {
           showCrisisBanner();
         },
 
+        onReplace: (content: string) => {
+          replaceStreamContent(content);
+        },
+
         onDone: (data: { session_message_count: number }) => {
           sessionMessageCount = data.session_message_count;
           finalizeStream({
@@ -113,6 +118,7 @@ export function useChat(): UseChatReturn {
       addUserMessage,
       startStreaming,
       appendStreamToken,
+      replaceStreamContent,
       finalizeStream,
       stopStreamingAction,
       setActiveSession,

@@ -27,6 +27,8 @@ interface ChatState {
   startStreaming: (abortController: AbortController) => void;
   /** Append a token to the streaming message. */
   appendStreamToken: (token: string) => void;
+  /** Replace the streaming message content (safety validation). */
+  replaceStreamContent: (content: string) => void;
   /** Finalize the stream and convert to a regular message. */
   finalizeStream: (metadata: {
     riskScore?: number;
@@ -128,6 +130,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       );
       return {
         streamingContent: newContent,
+        messages: updatedMessages,
+      };
+    });
+  },
+
+  replaceStreamContent: (content: string) => {
+    set((state) => {
+      const updatedMessages = state.messages.map((msg) =>
+        msg.isStreaming ? { ...msg, content } : msg
+      );
+      return {
+        streamingContent: content,
         messages: updatedMessages,
       };
     });

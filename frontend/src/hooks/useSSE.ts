@@ -92,6 +92,9 @@ export function useSSE(): UseSSEReturn {
         onCrisis: (resources) => {
           callbacks.onCrisis(resources);
         },
+        onReplace: (content) => {
+          callbacks.onReplace(content);
+        },
         onDone: (data) => {
           setIsConnected(false);
           controllerRef.current = null;

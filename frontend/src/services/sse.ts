@@ -6,6 +6,7 @@ export interface SSECallbacks {
   onMetadata: (data: MessageMetadata) => void;
   onToken: (token: string) => void;
   onCrisis: (resources: CrisisResource[]) => void;
+  onReplace: (content: string) => void;
   onDone: (data: { session_message_count: number }) => void;
   onError: (error: Error) => void;
 }
@@ -126,6 +127,9 @@ function routeEvent(
       break;
     case "crisis":
       callbacks.onCrisis(data.resources as CrisisResource[]);
+      break;
+    case "replace":
+      callbacks.onReplace(data.content as string);
       break;
     case "done":
       callbacks.onDone(data as unknown as { session_message_count: number });
