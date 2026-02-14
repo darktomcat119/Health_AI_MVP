@@ -10,8 +10,12 @@ The mock provider ships pattern-matched responses for development
 without requiring any external API keys.
 """
 
+import asyncio
 import logging
 import re
+from collections.abc import AsyncGenerator
+
+from openai import AsyncOpenAI, APIError, APIConnectionError, RateLimitError
 
 from app.config import get_settings
 from app.exceptions import LLMProviderException
@@ -22,6 +26,20 @@ logger = logging.getLogger(__name__)
 
 # Number of conversation turns to include as context for the LLM
 MAX_CONTEXT_MESSAGES = 10
+
+SYSTEM_PROMPT = (
+    "You are a compassionate, empathetic mental health support chatbot. "
+    "You are NOT a licensed therapist or medical professional. "
+    "Your role is to listen actively, validate feelings, and provide emotional support.\n\n"
+    "Guidelines:\n"
+    "- Never diagnose conditions or recommend medication\n"
+    "- Never minimize feelings or tell users to 'just calm down'\n"
+    "- Use empathetic, validating language\n"
+    "- Ask open-ended questions to understand the user better\n"
+    "- If someone is in crisis, encourage them to contact emergency services or a crisis hotline\n"
+    "- Keep responses concise but warm (2-4 sentences)\n"
+    "- Respond in the same language the user writes in"
+)
 
 
 class ResponseValidator:
@@ -136,12 +154,145 @@ class ChatbotService:
         settings = get_settings()
         if settings.llm_provider == "mock":
             return self._mock_response(message, session)
+        if settings.llm_provider == "openai":
+            return await self._openai_response(message, session)
 
         raise LLMProviderException(
             provider=settings.llm_provider,
             message=f"Provider '{settings.llm_provider}' is not implemented. "
             f"Use 'mock' for development.",
         )
+
+    async def _openai_response(self, message: str, session: Session) -> str:
+        """Call the OpenAI API with conversation context.
+
+        Args:
+            message: Anonymized user message.
+            session: Current session for conversation history.
+
+        Returns:
+            Raw LLM response text.
+
+        Raises:
+            LLMProviderException: On API errors.
+        """
+        settings = get_settings()
+        client = AsyncOpenAI(api_key=settings.llm_api_key)
+
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+        recent = session.messages[-MAX_CONTEXT_MESSAGES:]
+        for msg in recent:
+            role = "assistant" if msg.role == "assistant" else "user"
+            messages.append({"role": role, "content": msg.content})
+
+        messages.append({"role": "user", "content": message})
+
+        try:
+            params = {
+                "model": settings.llm_model,
+                "messages": messages,
+                "max_completion_tokens": settings.llm_max_tokens,
+            }
+            if settings.llm_temperature is not None:
+                params["temperature"] = settings.llm_temperature
+
+            response = await client.chat.completions.create(**params)
+            choice = response.choices[0]
+            content = choice.message.content or ""
+            logger.info(
+                "OpenAI response: finish_reason=%s, content_length=%d",
+                choice.finish_reason, len(content),
+            )
+            if not content:
+                logger.warning("OpenAI returned empty content: %s", choice.message)
+            return content
+        except RateLimitError as exc:
+            raise LLMProviderException(
+                provider="openai", message="Rate limit exceeded. Please try again later."
+            ) from exc
+        except APIConnectionError as exc:
+            raise LLMProviderException(
+                provider="openai", message="Could not connect to OpenAI API."
+            ) from exc
+        except APIError as exc:
+            raise LLMProviderException(
+                provider="openai", message=str(exc)
+            ) from exc
+
+    async def stream_response(
+        self, message: str, session: Session
+    ) -> AsyncGenerator[str, None]:
+        """Stream tokens from the LLM, yielding each as it arrives.
+
+        After all tokens are yielded, validates the full response.
+        If validation replaces the response, yields a special sentinel
+        so the caller can send a 'replace' SSE event.
+
+        Yields:
+            Individual tokens from the LLM, or a replacement sentinel
+            in the format ``__REPLACE__:<safe_text>`` if validation fails.
+        """
+        anonymized = self._anonymizer.anonymize(message)
+        settings = get_settings()
+
+        if settings.llm_provider == "openai":
+            full_text = ""
+            async for token in self._openai_stream(anonymized, session):
+                full_text += token
+                yield token
+
+            validated = self._validator.validate(full_text)
+            if validated != full_text:
+                yield f"__REPLACE__{validated}"
+        else:
+            # Mock and other providers: fall back to non-streaming
+            response = await self._get_llm_response(anonymized, session)
+            validated = self._validator.validate(response)
+            yield validated
+
+    async def _openai_stream(
+        self, message: str, session: Session
+    ) -> AsyncGenerator[str, None]:
+        """Stream tokens from the OpenAI API.
+
+        Args:
+            message: Anonymized user message.
+            session: Current session for conversation history.
+
+        Yields:
+            Individual content tokens from the model.
+        """
+        settings = get_settings()
+        client = AsyncOpenAI(api_key=settings.llm_api_key)
+
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+        recent = session.messages[-MAX_CONTEXT_MESSAGES:]
+        for msg in recent:
+            role = "assistant" if msg.role == "assistant" else "user"
+            messages.append({"role": role, "content": msg.content})
+
+        messages.append({"role": "user", "content": message})
+
+        try:
+            params = {
+                "model": settings.llm_model,
+                "messages": messages,
+                "max_completion_tokens": settings.llm_max_tokens,
+                "stream": True,
+            }
+            if settings.llm_temperature is not None:
+                params["temperature"] = settings.llm_temperature
+
+            stream = await client.chat.completions.create(**params)
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except (RateLimitError, APIConnectionError, APIError) as exc:
+            raise LLMProviderException(
+                provider="openai", message=str(exc)
+            ) from exc
 
     def _mock_response(self, message: str, session: Session) -> str:
         """Generate a pattern-matched mock response for development.

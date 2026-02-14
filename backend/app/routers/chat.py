@@ -173,20 +173,13 @@ async def stream_message(
     if triage.human_handoff:
         session_service.mark_handoff(session)
 
-    if triage.override_response:
-        bot_response = triage.override_response
-    else:
-        bot_response = await chatbot.generate_response(request.user_message, session)
-
-    session_service.add_bot_message(session, bot_response)
-
     logger.info(
         "Stream started: session_id=%s, risk_score=%d, triage=%s",
         session.id, risk_score, triage.triage_activated,
     )
 
     async def event_generator():
-        """Generate SSE events for the chat response."""
+        """Generate SSE events, streaming tokens from the LLM in real time."""
         metadata = {
             "type": "metadata",
             "session_id": session.id,
@@ -204,12 +197,30 @@ async def stream_message(
             }
             yield f"data: {json.dumps(crisis_data)}\n\n"
 
-        words = bot_response.split(" ")
-        for i, word in enumerate(words):
-            token = word + (" " if i < len(words) - 1 else "")
-            token_data = {"type": "token", "content": token}
-            yield f"data: {json.dumps(token_data)}\n\n"
-            await asyncio.sleep(STREAM_TOKEN_DELAY_SECONDS)
+        if triage.override_response:
+            # Triage override: fake-stream the canned response
+            words = triage.override_response.split(" ")
+            for i, word in enumerate(words):
+                token = word + (" " if i < len(words) - 1 else "")
+                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+                await asyncio.sleep(STREAM_TOKEN_DELAY_SECONDS)
+            bot_response = triage.override_response
+        else:
+            # Stream tokens from the LLM in real time
+            bot_response = ""
+            async for token in chatbot.stream_response(request.user_message, session):
+                if token.startswith("__REPLACE__"):
+                    # Validation replaced the response
+                    replacement = token[len("__REPLACE__"):]
+                    replace_data = {"type": "replace", "content": replacement}
+                    yield f"data: {json.dumps(replace_data)}\n\n"
+                    bot_response = replacement
+                else:
+                    bot_response += token
+                    token_data = {"type": "token", "content": token}
+                    yield f"data: {json.dumps(token_data)}\n\n"
+
+        session_service.add_bot_message(session, bot_response)
 
         done_data = {
             "type": "done",

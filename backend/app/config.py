@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "gpt-4"
     llm_max_tokens: int = 300
-    llm_temperature: float = 0.7
+    llm_temperature: float | None = None
 
     # Risk assessment thresholds (0-100 scale)
     risk_threshold_high: int = 60
