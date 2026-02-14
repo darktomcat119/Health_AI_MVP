@@ -38,7 +38,10 @@ SYSTEM_PROMPT = (
     "- Ask open-ended questions to understand the user better\n"
     "- If someone is in crisis, encourage them to contact emergency services or a crisis hotline\n"
     "- Keep responses concise but warm (2-4 sentences)\n"
-    "- Respond in the same language the user writes in"
+    "- Respond in the same language the user writes in\n"
+    "- User messages may contain privacy placeholders like [NAME], [EMAIL], [PHONE], or [ADDRESS]. "
+    "Never repeat these placeholders in your response. Simply skip over them naturally "
+    "and do not ask the user for their personal information."
 )
 
 
